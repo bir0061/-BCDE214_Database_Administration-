@@ -94,7 +94,7 @@ FROM RAW_UNCLEANED_DATA
 WHERE TRY_CONVERT(DATE, DOB, 103) IS NULL
   AND DOB IS NOT NULL;
 
---Fixed DOB  error
+-- DOB  error
 SELECT *
 FROM RAW_UNCLEANED_DATA
 WHERE DOB = '42/06/1949';
@@ -120,15 +120,105 @@ SELECT
 FROM RAW_UNCLEANED_DATA
 WHERE NHI IN ('BAK4481', 'QCH4565', 'JPV1836');
 
+--Fixing the DOB logic error
 UPDATE RAW_UNCLEANED_DATA
 SET DOB = '10/12/1972'
-WHERE NHI = 'BAK4481';
+WHERE NHI = 'BAK4481'
+  AND PatientName = 'Wandis Clipson';
+
+ --Fixing the Referal date logic error
+UPDATE RAW_UNCLEANED_DATA
+SET ReferralDate = '29/06/2023'
+WHERE NHI = 'QCH4565'
+  AND PatientName = 'Harrison Atkins';
+
+--Fixing the DOB logic error
+UPDATE RAW_UNCLEANED_DATA
+SET DOB = '10/05/1938'
+WHERE NHI = 'JPV1836'
+  AND PatientName = 'Howard Lang';
 
 
-SELECT 
-    NHI, opatientName,
-    COUNT(*) AS NumberOfRecords
+-- Checking completely blank records
+SELECT *
 FROM RAW_UNCLEANED_DATA
-WHERE NHI IS NOT NULL
-GROUP BY NHI
-HAVING COUNT(*) > 1;
+WHERE ReferralDate IS NULL
+  AND ReferredBy IS NULL
+  AND NHI IS NULL
+  AND PatientName IS NULL
+  AND DOB IS NULL
+  AND Department IS NULL
+  AND AddedToWaitlistDate IS NULL
+  AND Surgeon IS NULL
+  AND FSA_Date IS NULL
+  AND HealthTargetEligible IS NULL;
+
+  SELECT *
+FROM RAW_UNCLEANED_DATA
+WHERE NHI IS NULL
+   OR PatientName IS NULL
+   OR DOB IS NULL
+   OR Department IS NULL;
+
+-- Checking leading/trailing spaces
+SELECT *
+FROM RAW_UNCLEANED_DATA
+WHERE PatientName <> LTRIM(RTRIM(PatientName))
+   OR NHI <> LTRIM(RTRIM(NHI))
+   OR Department <> LTRIM(RTRIM(Department))
+   OR Surgeon <> LTRIM(RTRIM(Surgeon))
+   OR ReferredBy <> LTRIM(RTRIM(ReferredBy));
+
+
+-- Check FSA date before Referral Date
+SELECT
+    NHI,
+    PatientName,
+    ReferralDate,
+    FSA_Date
+FROM RAW_UNCLEANED_DATA
+WHERE TRY_CONVERT(DATE, FSA_Date, 103)
+      < TRY_CONVERT(DATE, ReferralDate, 103);
+
+
+-- check AddedToWaitlistDate
+SELECT
+    NHI,
+    PatientName,
+    ReferralDate,
+    AddedToWaitlistDate
+FROM RAW_UNCLEANED_DATA
+WHERE TRY_CONVERT(DATE, AddedToWaitlistDate, 103)
+      < TRY_CONVERT(DATE, ReferralDate, 103);
+
+-- Fixing AddedToWaitlistDate
+UPDATE RAW_UNCLEANED_DATA
+SET AddedToWaitlistDate = '04/07/2023'
+WHERE NHI = 'QCH4565'
+  AND PatientName = 'Harrison Atkins';
+
+--verifying the correction
+SELECT
+    NHI,
+	ReferredBy,
+    PatientName,
+    ReferralDate,
+    DOB,
+    AddedToWaitlistDate,
+	FSA_Date
+FROM RAW_UNCLEANED_DATA
+WHERE NHI = 'QCH4565'
+  AND PatientName = 'Harrison Atkins';
+
+CREATE TABLE PATIENT
+(
+    PatientNumber INT IDENTITY(1,1) NOT NULL,
+
+    PatientID AS
+        ('P' + RIGHT('0' + CAST(PatientNumber AS VARCHAR(3)), 3))
+        PERSISTED PRIMARY KEY,
+
+    NHI VARCHAR(20) NOT NULL UNIQUE,
+    PatientName VARCHAR(150) NOT NULL,
+    DOB VARCHAR(50) NOT NULL
+);
